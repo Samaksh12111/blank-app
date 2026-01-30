@@ -2,15 +2,35 @@ import streamlit as st
 import requests
 import uuid
 
+# ---------------- CONFIG ----------------
 FIREBASE_URL = "https://ticketbookingap-default-rtdb.firebaseio.com"
 
 st.set_page_config(page_title="Food App", layout="wide")
 
-# Session
+# Hide Streamlit UI
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+.card {
+    background:#111;
+    padding:20px;
+    border-radius:16px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.4);
+    margin-bottom:20px;
+}
+.food-name {font-size:22px;font-weight:bold;color:#fff;}
+.price {color:#00ff7f;font-size:18px;}
+.desc {color:#ccc;}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- SESSION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# ---------- FUNCTIONS ----------
+# ---------------- FUNCTIONS ----------------
 def register_user(email, password):
     uid = str(uuid.uuid4())
     data = {
@@ -18,69 +38,68 @@ def register_user(email, password):
         "password": password
     }
     requests.put(f"{FIREBASE_URL}/users/{uid}.json", json=data)
-    return True
 
 def login_user(email, password):
-    users = requests.get(f"{FIREBASE_URL}/users.json").json()
-    if users:
-        for uid, user in users.items():
-            if user["email"] == email and user["password"] == password:
-                return True
+    res = requests.get(f"{FIREBASE_URL}/users.json").json()
+
+    if not res:
+        return False
+
+    for uid, user in res.items():
+        if not isinstance(user, dict):
+            continue
+
+        db_email = user.get("email")
+        db_pass = user.get("password")
+
+        if db_email == email and db_pass == password:
+            return True
+
     return False
 
-# ---------- UI ----------
-st.markdown("""
-<style>
-.card {
-    background:#ffffff;
-    padding:20px;
-    border-radius:15px;
-    box-shadow:0 8px 20px rgba(0,0,0,0.1);
-    margin-bottom:20px;
-}
-.food-name {font-size:22px;font-weight:bold;}
-.price {color:green;font-size:18px;}
-</style>
-""", unsafe_allow_html=True)
-
-# ---------- LOGIN / REGISTER ----------
+# ---------------- AUTH UI ----------------
 if not st.session_state.logged_in:
-    tab1, tab2 = st.tabs(["Login", "Register"])
+    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
 
     with tab1:
-        st.subheader("🔑 Login")
+        st.subheader("Login")
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
 
         if st.button("Login"):
-            if login_user(email, password):
-                st.session_state.logged_in = True
-                st.success("Login Successful ✅")
-                st.rerun()
+            if email and password:
+                if login_user(email, password):
+                    st.session_state.logged_in = True
+                    st.success("Login Successful ✅")
+                    st.rerun()
+                else:
+                    st.error("Invalid Email or Password ❌")
             else:
-                st.error("Invalid Email or Password ❌")
+                st.warning("All fields required")
 
     with tab2:
-        st.subheader("📝 Register")
+        st.subheader("Register")
         remail = st.text_input("Email ", key="r1")
         rpass = st.text_input("Password ", type="password", key="r2")
         cpass = st.text_input("Confirm Password", type="password", key="r3")
 
-        if st.button("Register"):
-            if rpass != cpass:
-                st.error("Password not matched ❌")
+        if st.button("Create Account"):
+            if not remail or not rpass or not cpass:
+                st.warning("All fields required")
+            elif rpass != cpass:
+                st.error("Passwords do not match ❌")
             else:
                 register_user(remail, rpass)
-                st.success("Registration Successful 🎉 Please Login")
+                st.success("Registration Successful 🎉 Now Login")
 
-# ---------- FOOD HOME ----------
+# ---------------- FOOD HOME ----------------
 else:
     st.title("🍔 Food App")
-    st.write("Order your favorite food 😋")
+    st.write("Swiggy / Zomato style food cards 😋")
 
     foods = [
-        {"name": "Cheese Burger", "price": "₹99", "desc": "Juicy & tasty"},
-        {"name": "Pizza", "price": "₹199", "desc": "Cheesy delight"},
+        {"name": "Cheese Burger", "price": "₹99", "desc": "Juicy & cheesy"},
+        {"name": "Pizza", "price": "₹199", "desc": "Extra cheese loaded"},
         {"name": "Pasta", "price": "₹149", "desc": "Italian classic"},
         {"name": "French Fries", "price": "₹79", "desc": "Crispy & hot"},
     ]
@@ -92,7 +111,7 @@ else:
             <div class="card">
                 <div class="food-name">{food['name']}</div>
                 <div class="price">{food['price']}</div>
-                <p>{food['desc']}</p>
+                <div class="desc">{food['desc']}</div>
             </div>
             """, unsafe_allow_html=True)
 
