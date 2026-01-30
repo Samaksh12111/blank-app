@@ -1,14 +1,14 @@
 import streamlit as st
 import re
 
-# ---------------- CONFIG ----------------
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="Food App",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# ---------------- SESSION ----------------
+# ---------------- SESSION STATE ----------------
 if "users" not in st.session_state:
     st.session_state.users = {}   # {email: password}
 
@@ -25,32 +25,24 @@ def gmail_valid(email):
 def logout():
     st.session_state.logged = False
     st.session_state.user = ""
-    st.experimental_rerun()
+    st.rerun()   # ✅ FIXED
 
 # ---------------- STYLES ----------------
 st.markdown("""
 <style>
-body {
-    background-color: #0f0f0f;
-}
+body { background:#fafafa; }
 .card {
-    background: #1c1c1c;
-    padding: 20px;
-    border-radius: 18px;
-    width: 220px;
-    margin-right: 15px;
+    background:white;
+    padding:20px;
+    border-radius:16px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.1);
+    width:220px;
 }
-.price {
-    color: #2ecc71;
-    font-size: 20px;
-}
-.drawer {
-    padding: 10px;
-}
+.price { color:#27ae60; font-size:18px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- AUTH ----------------
+# ---------------- AUTH UI ----------------
 if not st.session_state.logged:
 
     tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
@@ -66,7 +58,7 @@ if not st.session_state.logged:
             if email in st.session_state.users and st.session_state.users[email] == password:
                 st.session_state.logged = True
                 st.session_state.user = email
-                st.experimental_rerun()
+                st.rerun()   # ✅ FIXED
             else:
                 st.error("Invalid email or password")
 
@@ -87,7 +79,7 @@ if not st.session_state.logged:
                 st.error("Email already registered")
             else:
                 st.session_state.users[email] = p1
-                st.success("Registration successful 🎉 Now Login")
+                st.success("Registration successful 🎉 Please login")
 
 # ---------------- MAIN APP ----------------
 else:
@@ -95,7 +87,7 @@ else:
 
     # -------- SIDEBAR --------
     with st.sidebar:
-        st.markdown("### 👤 " + username)
+        st.markdown(f"### 👤 {username}")
         st.markdown("---")
         st.button("📦 Orders")
         st.button("🛟 Support")
@@ -103,20 +95,16 @@ else:
             logout()
 
     # -------- HEADER --------
-    col1, col2 = st.columns([1, 10])
-    with col1:
-        st.markdown("## ☰")
-    with col2:
-        st.markdown(f"## Welcome, {username} 👋")
+    st.markdown(f"## 🍔 Welcome {username}")
 
     # -------- FOOD ITEMS --------
     foods = [
         ("Burger", 129, "Juicy & tasty"),
-        ("Pizza", 199, "Extra cheese"),
-        ("Pasta", 149, "Italian classic"),
-        ("French Fries", 79, "Crispy"),
+        ("Pizza", 199, "Cheesy delight"),
+        ("Pasta", 149, "Italian style"),
+        ("Fries", 79, "Crispy"),
         ("Sandwich", 99, "Fresh"),
-        ("Momos", 89, "Hot & spicy"),
+        ("Momos", 89, "Spicy"),
         ("Taco", 159, "Mexican"),
         ("Noodles", 139, "Street style")
     ]
