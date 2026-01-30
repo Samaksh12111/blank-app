@@ -1,183 +1,134 @@
 import streamlit as st
-import re
+import pyrebase
+import bcrypt
+import uuid
+from datetime import datetime
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="FoodieHub", layout="wide", initial_sidebar_state="collapsed")
+# Firebase Configuration (Replace with your actual config from Firebase Console)
+firebase_config = {
+    "apiKey": "AIzaSyYourApiKeyFromConsole",
+    "authDomain": "ticketbookingap-default-rtdb.firebaseapp.com",
+    "databaseURL": "https://ticketbookingap-default-rtdb.firebaseio.com/",
+    "projectId": "ticketbookingap-default-rtdb",
+    "storageBucket": "ticketbookingap-default-rtdb.appspot.com",
+    "messagingSenderId": "123456789012",
+    "appId": "1:123456789012:web:abcdef123456"
+}
 
-# ---------------- HIDE STREAMLIT UI ----------------
-st.markdown("""
-<style>
-#MainMenu {visibility: hidden;}
-header {visibility: hidden;}
-footer {visibility: hidden;}
-body {
-    background-color: #0e1117;
-    color: white;
-    font-family: 'Arial', sans-serif;
-}
-.sidebar-drawer {
-    position: fixed;
-    top: 0;
-    left: -44%;
-    width: 44%;
-    height: 100%;
-    background: #1f1f1f;
-    z-index: 1000;
-    transition: left 0.3s;
-    padding: 20px;
-}
-.sidebar-drawer.open {
-    left: 0;
-}
-.drawer-item {
-    margin: 20px 0;
-    font-size: 18px;
-    cursor: pointer;
-}
-.hamburger {
-    font-size: 24px;
-    cursor: pointer;
-}
-.food-container {
-    display: flex;
-    overflow-x: auto;
-    gap: 16px;
-    padding: 16px 0;
-}
-.food-card {
-    min-width: 200px;
-    background: #ffffff;
-    color: #000;
-    border-radius: 18px;
-    padding: 10px;
-    flex-shrink: 0;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-}
-.food-card img {
-    width: 100%;
-    border-radius: 14px;
-}
-.food-card h3 {
-    margin: 8px 0 4px 0;
-}
-.food-card .price {
-    color: #27ae60;
-    font-weight: bold;
-}
-</style>
-""", unsafe_allow_html=True)
+# Initialize Firebase
+firebase = pyrebase.initialize_app(firebase_config)
+db = firebase.database()
 
-# ---------------- SESSION ----------------
-if "users" not in st.session_state:
-    st.session_state.users = {}
-if "logged" not in st.session_state:
-    st.session_state.logged = False
-if "user" not in st.session_state:
-    st.session_state.user = ""
-if "drawer_open" not in st.session_state:
-    st.session_state.drawer_open = False
+# Helper Functions
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-# ---------------- HELPERS ----------------
-def gmail_valid(email):
-    return re.fullmatch(r"[a-zA-Z0-9._%+-]+@gmail\.com", email)
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def logout():
-    st.session_state.logged = False
-    st.session_state.user = ""
-    st.session_state.drawer_open = False
-    st.experimental_rerun()
+def generate_uid():
+    return str(uuid.uuid4())
 
-# ---------------- AUTH ----------------
-if not st.session_state.logged:
+def is_valid_email(email):
+    return "@" in email and "." in email
 
-    st.title("🍔 FoodieHub")
-    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
+# Session State for User
+if 'user_uid' not in st.session_state:
+    st.session_state.user_uid = None
 
-    with tab1:
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            if email in st.session_state.users and st.session_state.users[email] == password:
-                st.session_state.logged = True
-                st.session_state.user = email
-                st.experimental_rerun()
-            else:
-                st.error("Invalid email or password")
-
-    with tab2:
-        email = st.text_input("Email", key="reg_email")
-        p1 = st.text_input("Password", type="password", key="reg_pass")
-        p2 = st.text_input("Confirm Password", type="password", key="reg_cpass")
-        if st.button("Create Account"):
-            if not gmail_valid(email):
-                st.error("Only @gmail.com allowed")
-            elif p1 != p2:
-                st.error("Passwords do not match")
-            elif email in st.session_state.users:
-                st.error("Already registered")
-            else:
-                st.session_state.users[email] = p1
-                st.success("Account created 🎉 Login now")
-
-# ---------------- MAIN APP ----------------
+# Sidebar: Show UID if logged in
+if st.session_state.user_uid:
+    st.sidebar.success(f"Logged in as: {st.session_state.user_uid}")
+    if st.sidebar.button("Logout"):
+        st.session_state.user_uid = None
+        st.rerun()
 else:
-    username = st.session_state.user.split("@")[0]
+    st.sidebar.info("Please login or register.")
 
-    # Hamburger icon for drawer
-    st.markdown(f"""
-    <div>
-        <span class="hamburger" onclick="toggleDrawer()">☰</span>
-        <h2>🍔 Welcome {username}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+# Main App Logic
+st.title("Ticket Booking App")
 
-    # Drawer HTML
-    st.markdown(f"""
-    <div id="drawer" class="sidebar-drawer">
-        <div class="drawer-item">{username}</div>
-        <div class="drawer-item">Orders</div>
-        <div class="drawer-item">Support</div>
-        <div class="drawer-item" onclick="logoutClicked()">Logout</div>
-    </div>
-    <script>
-    const drawer = document.getElementById('drawer');
-    function toggleDrawer() {{
-        drawer.classList.toggle('open');
-    }}
-    function logoutClicked() {{
-        fetch('/?logout=1').then(()=>{{location.reload();}});
-    }}
-    </script>
-    """, unsafe_allow_html=True)
+# Page Selection
+page = st.selectbox("Navigate", ["Login", "Register", "Dashboard"]) if not st.session_state.user_uid else "Dashboard"
 
-    # Check for logout via JS
-    if st.experimental_get_query_params().get("logout"):
-        logout()
+if page == "Register":
+    st.header("Register")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    confirm_password = st.text_input("Confirm Password", type="password")
+    
+    if st.button("Register"):
+        if not is_valid_email(email):
+            st.error("Invalid email format.")
+        elif password != confirm_password:
+            st.error("Passwords do not match.")
+        elif len(password) < 6:
+            st.error("Password must be at least 6 characters.")
+        else:
+            # Check if user exists
+            users = db.child("users").get().val() or {}
+            if any(user.get("email") == email for user in users.values()):
+                st.error("Email already registered.")
+            else:
+                uid = generate_uid()
+                hashed_pw = hash_password(password)
+                db.child("users").child(uid).set({
+                    "email": email,
+                    "password": hashed_pw,
+                    "uid": uid
+                })
+                st.session_state.user_uid = uid
+                st.success("Registered successfully! UID shown in sidebar.")
+                st.rerun()
 
-    # Dishes horizontal scroll
-    foods = [
-        ("Burger", 129, "Juicy & tasty",
-         "https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=400&q=80"),
-        ("Pizza", 199, "Cheesy delight",
-         "https://images.unsplash.com/photo-1548365328-9f547fb0951c?auto=format&fit=crop&w=400&q=80"),
-        ("Pasta", 149, "Italian style",
-         "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=400&q=80"),
-        ("Momos", 89, "Spicy momos",
-         "https://images.unsplash.com/photo-1604909053196-2c7c5b5a8c89?auto=format&fit=crop&w=400&q=80"),
-        ("French Fries", 79, "Crispy & hot",
-         "https://images.unsplash.com/photo-1617196037110-8c6b7f14cfb1?auto=format&fit=crop&w=400&q=80"),
-    ]
+elif page == "Login":
+    st.header("Login")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        users = db.child("users").get().val() or {}
+        user_found = None
+        for uid, user in users.items():
+            if user.get("email") == email and check_password(password, user.get("password", "")):
+                user_found = uid
+                break
+        if user_found:
+            st.session_state.user_uid = user_found
+            st.success("Logged in! UID shown in sidebar.")
+            st.rerun()
+        else:
+            st.error("Invalid credentials.")
 
-    st.markdown("### 🍽 Popular Dishes")
-    dish_html = '<div class="food-container">'
-    for f in foods:
-        dish_html += f"""
-        <div class="food-card">
-            <img src="{f[3]}">
-            <h3>{f[0]}</h3>
-            <div class="price">₹{f[1]}</div>
-            <p>{f[2]}</p>
-        </div>
-        """
-    dish_html += '</div>'
-    st.markdown(dish_html, unsafe_allow_html=True)
+elif page == "Dashboard" and st.session_state.user_uid:
+    st.header("Dashboard")
+    
+    # Order Placement
+    st.subheader("Place an Order")
+    event = st.text_input("Event Name")
+    tickets = st.number_input("Number of Tickets", min_value=1, step=1)
+    
+    if st.button("Place Order"):
+        if event.strip():
+            order_id = generate_uid()
+            order_data = {
+                "order_id": order_id,
+                "user_uid": st.session_state.user_uid,
+                "event": event,
+                "tickets": tickets,
+                "timestamp": datetime.now().isoformat()
+            }
+            db.child("orders").child(order_id).set(order_data)
+            st.success("Order placed! It will appear in orders.html (hosted separately).")
+        else:
+            st.error("Please enter an event name.")
+    
+    # View Orders (Optional: For the app itself)
+    st.subheader("Your Orders")
+    orders = db.child("orders").get().val() or {}
+    user_orders = {k: v for k, v in orders.items() if v.get("user_uid") == st.session_state.user_uid}
+    if user_orders:
+        for order in user_orders.values():
+            st.write(f"Event: {order['event']}, Tickets: {order['tickets']}, Time: {order['timestamp']}")
+    else:
+        st.info("No orders yet.")
