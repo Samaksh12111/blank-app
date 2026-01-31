@@ -1,4 +1,4 @@
 streamlit
-pyrebase
-bcrypt
 requests
+beautifulsoup4
+plyer
